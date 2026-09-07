@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sonido Vivo - Tienda de Instrumentos Musicales</title>
+  
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
+    <div class="container">
+      <a class="navbar-brand fw-bold text-warning fs-3 d-flex align-items-center gap-2" href="index.html">
+        <i class="fa-solid fa-guitar"></i> Sonido Vivo
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <div class="mx-auto my-2 my-lg-0 w-50">
+          <div class="input-group">
+            <input type="text" id="searchInput" class="form-control" placeholder="Buscar instrumento..." onkeyup="filtrarProductos()">
+            <button class="btn btn-warning" type="button"><i class="fa-solid fa-magnifying-glass"></i></button>
+          </div>
+        </div>
+        <ul class="navbar-nav ms-auto align-items-center gap-2">
+          <li class="nav-item">
+            <a class="nav-link text-white fw-semibold" href="login.html"><i class="fa-solid fa-user me-1"></i> Admin</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-white fw-semibold" href="registro.html"><i class="fa-solid fa-user-plus me-1"></i> Registro</a>
+          </li>
+          <li class="nav-item">
+            <button class="btn btn-outline-warning position-relative ms-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
+              <i class="fa-solid fa-cart-shopping"></i>
+              <span id="cartCountBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">0</span>
+            </button>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+  <section class="bg-dark text-white text-center py-5 mb-4 shadow-sm" style="background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=1200&q=80') center/cover;">
+    <div class="container py-4">
+      <h1 class="display-4 fw-bold text-warning">Los Mejores Instrumentos al Mejor Precio</h1>
+      <p class="lead">Guitarras, bajos, baterías, teclados y accesorios con envío a todo Chile.</p>
+    </div>
+  </section>
+
+  <main class="container my-4">
+    <div class="d-flex justify-content-center flex-wrap gap-2 mb-4" id="categoryFilters">
+      <button class="btn btn-outline-dark rounded-pill active px-3" onclick="filtrarCategoria('Todos', this)">Todos</button>
+      <button class="btn btn-outline-dark rounded-pill px-3" onclick="filtrarCategoria('Guitarras Acústicas', this)">Guitarras Acústicas</button>
+      <button class="btn btn-outline-dark rounded-pill px-3" onclick="filtrarCategoria('Guitarras Eléctricas', this)">Guitarras Eléctricas</button>
+      <button class="btn btn-outline-dark rounded-pill px-3" onclick="filtrarCategoria('Bajos Eléctricos', this)">Bajos Eléctricos</button>
+      <button class="btn btn-outline-dark rounded-pill px-3" onclick="filtrarCategoria('Baterías', this)">Baterías</button>
+      <button class="btn btn-outline-dark rounded-pill px-3" onclick="filtrarCategoria('Teclados y Pianos', this)">Teclados y Pianos</button>
+      <button class="btn btn-outline-dark rounded-pill px-3" onclick="filtrarCategoria('Amplificadores', this)">Amplificadores</button>
+      <button class="btn btn-outline-dark rounded-pill px-3" onclick="filtrarCategoria('Accesorios', this)">Accesorios</button>
+    </div>
+
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 row-cols-xl-4 g-4" id="productGrid">
+    </div>
+
+    <section class="my-5 pt-4 border-top">
+      <h3 class="fw-bold mb-3"><i class="fa-solid fa-location-dot me-2 text-danger"></i>Nuestra Tienda Física</h3>
+      <p class="text-muted">Visítanos en Av. Concha y Toro 1234, Puente Alto. ¡Prueba los instrumentos antes de comprar!</p>
+      <div id="map" class="rounded-3 shadow-sm" style="height: 350px;"></div>
+    </section>
+  </main>
+
+  <div class="offcanvas offcanvas-end" tabindex="-1" id="cartOffcanvas" aria-labelledby="cartOffcanvasLabel">
+    <div class="offcanvas-header bg-dark text-white">
+      <h5 class="offcanvas-title fw-bold" id="cartOffcanvasLabel"><i class="fa-solid fa-cart-shopping me-2"></i>Mi Carrito</h5>
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body d-flex flex-column">
+      <div id="cartItemsContainer" class="flex-grow-1 overflow-auto">
+        <p class="text-center text-muted py-4">El carrito está vacío</p>
+      </div>
+      <div class="border-top pt-3 mt-auto">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <span class="fs-5 fw-bold">Total:</span>
+          <span id="cartTotal" class="fs-4 fw-bold text-success">$0</span>
+        </div>
+        <button class="btn btn-warning w-100 fw-bold py-2" onclick="openCheckoutModal()">Proceder al Pago</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal fade" id="checkoutModal" tabindex="-1" aria-labelledby="checkoutModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content rounded-4 shadow border-0">
+        <div class="modal-header bg-dark text-white">
+          <h5 class="modal-title fw-bold" id="checkoutModalLabel"><i class="fa-solid fa-credit-card me-2"></i>Finalizar Compra</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-4">
+          <form id="checkoutForm" onsubmit="procesarPago(event)">
+            <h6 class="fw-bold mb-3 text-primary">1. Datos Personales</h6>
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Nombre Completo</label>
+                <input type="text" class="form-control" required placeholder="Ej. Juan Pérez">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Teléfono</label>
+                <input type="tel" class="form-control" required placeholder="+56 9 1234 5678">
+              </div>
+              <div class="col-md-12">
+                <label class="form-label fw-semibold">Correo Electrónico</label>
+                <input type="email" class="form-control" required placeholder="correo@ejemplo.com">
+              </div>
+            </div>
+
+            <h6 class="fw-bold mb-3 text-primary">2. Tipo de Entrega</h6>
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <div class="form-check card p-3 border shadow-sm">
+                  <input class="form-check-input" type="radio" name="tipoEntrega" id="entregaRetiro" value="retiro" checked onchange="toggleDireccion(false)">
+                  <label class="form-check-label fw-semibold" for="entregaRetiro">
+                    <i class="fa-solid fa-store me-1"></i> Retiro en Tienda (Gratis)
+                  </label>
+                  <small class="text-muted d-block mt-1">Av. Concha y Toro 1234, Puente Alto</small>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check card p-3 border shadow-sm">
+                  <input class="form-check-input" type="radio" name="tipoEntrega" id="entregaDespacho" value="despacho" onchange="toggleDireccion(true)">
+                  <label class="form-check-label fw-semibold" for="entregaDespacho">
+                    <i class="fa-solid fa-truck me-1"></i> Despacho a Domicilio
+                  </label>
+                  <small class="text-muted d-block mt-1">Envíos a todo Chile</small>
+                </div>
+              </div>
+              <div class="col-12 d-none" id="direccionContainer">
+                <label class="form-label fw-semibold">Dirección de Envío</label>
+                <input type="text" id="inputDireccion" class="form-control" placeholder="Calle, número, comuna y región">
+              </div>
+            </div>
+
+            <h6 class="fw-bold mb-3 text-primary">3. Método de Pago</h6>
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <div class="form-check card p-3 border shadow-sm">
+                  <input class="form-check-input" type="radio" name="metodoPago" id="pagoDebito" value="debito" checked>
+                  <label class="form-check-label fw-semibold" for="pagoDebito">
+                    <i class="fa-solid fa-building-columns me-1"></i> Redcompra / Débito
+                  </label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check card p-3 border shadow-sm">
+                  <input class="form-check-input" type="radio" name="metodoPago" id="pagoCredito" value="credito">
+                  <label class="form-check-label fw-semibold" for="pagoCredito">
+                    <i class="fa-solid fa-credit-card me-1"></i> Tarjeta de Crédito
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="border-top pt-3 d-flex justify-content-between align-items-center">
+              <div>
+                <span class="text-muted d-block fs-7">Total a pagar:</span>
+                <span id="modalCartTotal" class="fs-4 fw-bold text-success">$0</span>
+              </div>
+              <button type="submit" class="btn btn-warning btn-lg fw-bold px-4">Confirmar y Pagar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="bg-dark text-white pt-5 pb-4 mt-5 border-top border-warning border-3">
+    <div class="container text-center text-md-start">
+      <div class="row text-center text-md-start">
+
+        <div class="col-md-3 col-lg-3 col-xl-3 mx-auto mt-3">
+          <h5 class="text-uppercase mb-4 fw-bold text-warning d-flex align-items-center gap-2 justify-content-center justify-content-md-start">
+            <i class="fa-solid fa-guitar"></i> Sonido Vivo
+          </h5>
+          <p class="text-secondary small">
+            Tu tienda de instrumentos musicales de confianza. Importadores directos de las mejores marcas del mundo con envío a todo Chile.
+          </p>
+          <p class="text-secondary small mb-0">
+            <i class="fa-solid fa-location-dot me-2 text-danger"></i>Av. Concha y Toro 1234, Puente Alto, Santiago.
+          </p>
+        </div>
+
+        <div class="col-md-2 col-lg-2 col-xl-2 mx-auto mt-3">
+          <h6 class="text-uppercase mb-4 fw-bold text-warning">Categorías</h6>
+          <p class="mb-2"><a href="#categoryFilters" onclick="filtrarCategoria('Guitarras Acústicas')" class="text-secondary text-decoration-none hover-warning">Guitarras Acústicas</a></p>
+          <p class="mb-2"><a href="#categoryFilters" onclick="filtrarCategoria('Guitarras Eléctricas')" class="text-secondary text-decoration-none hover-warning">Guitarras Eléctricas</a></p>
+          <p class="mb-2"><a href="#categoryFilters" onclick="filtrarCategoria('Bajos Eléctricos')" class="text-secondary text-decoration-none hover-warning">Bajos Eléctricos</a></p>
+          <p class="mb-2"><a href="#categoryFilters" onclick="filtrarCategoria('Baterías')" class="text-secondary text-decoration-none hover-warning">Baterías</a></p>
+          <p class="mb-2"><a href="#categoryFilters" onclick="filtrarCategoria('Teclados y Pianos')" class="text-secondary text-decoration-none hover-warning">Teclados y Pianos</a></p>
+          <p class="mb-2"><a href="#categoryFilters" onclick="filtrarCategoria('Amplificadores')" class="text-secondary text-decoration-none hover-warning">Amplificadores</a></p>
+        </div>
+
+        <div class="col-md-3 col-lg-2 col-xl-2 mx-auto mt-3">
+          <h6 class="text-uppercase mb-4 fw-bold text-warning">Horario Tienda</h6>
+          <p class="text-secondary small mb-1"><i class="fa-solid fa-clock me-2 text-warning"></i><strong>Lun - Vie:</strong> 10:00 - 19:30 hrs</p>
+          <p class="text-secondary small mb-1"><i class="fa-solid fa-clock me-2 text-warning"></i><strong>Sábados:</strong> 10:30 - 15:00 hrs</p>
+          <p class="text-secondary small mb-3"><i class="fa-solid fa-ban me-2 text-danger"></i><strong>Dom y Festivos:</strong> Cerrado</p>
+          
+          <h6 class="text-uppercase mb-2 fw-bold text-warning">Contacto</h6>
+          <p class="text-secondary small mb-1"><i class="fa-solid fa-phone me-2 text-warning"></i>+56 9 1234 5678</p>
+          <p class="text-secondary small mb-0"><i class="fa-solid fa-envelope me-2 text-warning"></i>contacto@sonidovivo.cl</p>
+        </div>
+
+        <div class="col-md-4 col-lg-3 col-xl-3 mx-auto mt-3">
+          <h6 class="text-uppercase mb-3 fw-bold text-warning">Síguenos</h6>
+          <div class="d-flex justify-content-center justify-content-md-start gap-2 mb-4">
+            <a href="#" class="btn btn-outline-warning btn-sm rounded-circle" style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;"><i class="fa-brands fa-facebook-f"></i></a>
+            <a href="#" class="btn btn-outline-warning btn-sm rounded-circle" style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;"><i class="fa-brands fa-instagram"></i></a>
+            <a href="#" class="btn btn-outline-warning btn-sm rounded-circle" style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;"><i class="fa-brands fa-youtube"></i></a>
+            <a href="#" class="btn btn-outline-warning btn-sm rounded-circle" style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;"><i class="fa-brands fa-whatsapp"></i></a>
+          </div>
+
+          <h6 class="text-uppercase mb-2 fw-bold text-warning">Medios de Pago</h6>
+          <div class="d-flex justify-content-center justify-content-md-start gap-2 text-secondary fs-4">
+            <i class="fa-solid fa-credit-card" title="Tarjeta de Crédito"></i>
+            <i class="fa-solid fa-building-columns" title="Redcompra / Débito"></i>
+            <i class="fa-solid fa-money-bill-transfer" title="Transferencia Bancaria"></i>
+          </div>
+        </div>
+
+      </div>
+
+      <hr class="mb-4 text-secondary">
+      <div class="row align-items-center">
+        <div class="col-md-7 col-lg-8 text-center text-md-start">
+          <p class="text-secondary small mb-0">&copy; 2026 Sonido Vivo. Todos los derechos reservados.</p>
+        </div>
+        <div class="col-md-5 col-lg-4 text-center text-md-end">
+          <small class="text-secondary">Diseñado con <i class="fa-solid fa-heart text-danger"></i> para Músicos</small>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="script.js"></script>
+</body>
+</html>

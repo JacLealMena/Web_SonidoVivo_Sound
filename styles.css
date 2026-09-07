@@ -1,0 +1,45 @@
+body {
+  background-color: #f8f9fa;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.hero-banner {
+  background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), 
+              url('https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=1350&q=80') center/cover no-repeat;
+  color: #fff;
+  padding: 80px 20px;
+}
+
+.product-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  height: 100%;
+}
+
+.product-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.15) !important;
+}
+
+.product-img-wrapper {
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #fff;
+  padding: 15px;
+}
+
+.product-img-wrapper img {
+  max-height: 100%;
+  object-fit: contain;
+}
+
+#map {
+  height: 350px;
+  border-radius: 12px;
+}
+
+.hover-warning:hover {
+  color: #ffc107 !important;
+  transition: color 0.2s ease-in-out;
+}
