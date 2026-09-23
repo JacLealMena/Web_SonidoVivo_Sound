@@ -438,11 +438,15 @@ function modalAgregarProducto() {
     html: `
       <input id="swal-nombre" class="swal2-input" placeholder="Nombre del producto">
       <select id="swal-categoria" class="swal2-input">
-        <option value="Guitarras">Guitarras</option>
-        <option value="Bajos">Bajos</option>
+        <option value="Guitarras Acústicas">Guitarras Acústicas</option>
+        <option value="Guitarras Eléctricas">Guitarras Eléctricas</option>
+        <option value="Bajos Eléctricos">Bajos Eléctricos</option>
         <option value="Baterías">Baterías</option>
-        <option value="Teclados">Teclados</option>
+        <option value="Teclados y Pianos">Teclados y Pianos</option>
         <option value="Amplificadores">Amplificadores</option>
+        <option value="Micrófonos">Micrófonos</option>
+        <option value="Pedales de Efectos">Pedales de Efectos</option>
+        <option value="Estudio y Grabación">Estudio y Grabación</option>
         <option value="Accesorios">Accesorios</option>
       </select>
       <input id="swal-precio" type="number" class="swal2-input" placeholder="Precio ($ CLP)">
