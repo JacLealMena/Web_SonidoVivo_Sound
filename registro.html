@@ -16,15 +16,15 @@
             <form onsubmit="procesarRegistro(event)">
               <div class="mb-3">
                 <label class="form-label fw-semibold">Nombre Completo</label>
-                <input type="text" class="form-control" required placeholder="Ej. Ana María">
+                <input id="registroNombre" type="text" class="form-control" required placeholder="Ej. Ana María">
               </div>
               <div class="mb-3">
                 <label class="form-label fw-semibold">Correo Electrónico</label>
-                <input type="email" class="form-control" required placeholder="correo@ejemplo.com">
+                <input id="registroEmail" type="email" class="form-control" required placeholder="correo@ejemplo.com">
               </div>
               <div class="mb-3">
                 <label class="form-label fw-semibold">Contraseña</label>
-                <input type="password" class="form-control" required placeholder="••••••••">
+                <input id="registroPassword" type="password" class="form-control" required placeholder="••••••••">
               </div>
               <button type="submit" class="btn btn-warning w-100 py-2 fw-bold mb-3">Registrarse</button>
             </form>
