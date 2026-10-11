@@ -1,0 +1,89 @@
+body {
+  margin: 0;
+  background: #f5f7fb;
+  color: #212529;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.hero-banner {
+  color: #fff;
+  background: linear-gradient(rgba(0, 0, 0, .7), rgba(0, 0, 0, .7)),
+    url('https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=1350&q=80') center/cover no-repeat;
+  padding: 5rem 1.25rem;
+}
+
+.product-card {
+  height: 100%;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.product-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, .15) !important;
+}
+
+.product-img-wrapper {
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  padding: 15px;
+}
+
+.product-img-wrapper img {
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.dashboard-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, .96), rgba(247, 249, 252, .96));
+  border: 1px solid rgba(15, 23, 42, .05);
+}
+
+.info-panel {
+  background: linear-gradient(135deg, #fff, #f8fafc);
+  border: 1px solid rgba(15, 23, 42, .06);
+  border-radius: 1.25rem;
+}
+
+.bar-track {
+  height: 10px;
+  overflow: hidden;
+  background: #e9edf3;
+  border-radius: 999px;
+}
+
+.bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #0d6efd, #198754);
+  border-radius: 999px;
+}
+
+.warning-item {
+  background: #fffaf0;
+  border-left: 4px solid #ffc107;
+  border-radius: .75rem;
+}
+
+#map {
+  height: 350px;
+  border-radius: 12px;
+}
+
+.admin-tabs {
+  overflow-x: auto;
+  flex-wrap: nowrap;
+}
+
+.admin-tabs .nav-link {
+  white-space: nowrap;
+}
