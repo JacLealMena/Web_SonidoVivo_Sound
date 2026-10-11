@@ -49,6 +49,12 @@ function readStorage(key, fallback) {
   }
 }
 
+function escapeHTML(value) {
+  const element = document.createElement('div');
+  element.textContent = String(value ?? '');
+  return element.innerHTML;
+}
+
 function saveProducts() {
   localStorage.setItem(STORAGE_KEYS.PRODUCTOS, JSON.stringify(productos));
 }
@@ -98,24 +104,10 @@ function seedData() {
     { id: 3, nombre: 'Cliente Demo', email: 'cliente@sonidovivo.cl', password: '123456', rol: ROLES.CLIENTE, activo: true }
   ];
 
-  const storedUsers = readStorage(STORAGE_KEYS.USUARIOS, []);
-  const usuariosMap = new Map((storedUsers || []).map((usuario) => [usuario.email.toLowerCase(), usuario]));
-
-  usuariosIniciales.forEach((usuarioBase) => {
-    const emailKey = usuarioBase.email.toLowerCase();
-    if (usuariosMap.has(emailKey)) {
-      const actual = usuariosMap.get(emailKey);
-      actual.nombre = usuarioBase.nombre;
-      actual.password = usuarioBase.password;
-      actual.rol = usuarioBase.rol;
-      actual.activo = true;
-    } else {
-      storedUsers.push({ ...usuarioBase });
-      usuariosMap.set(emailKey, { ...usuarioBase });
-    }
-  });
-
-  localStorage.setItem(STORAGE_KEYS.USUARIOS, JSON.stringify(storedUsers));
+  const storedUsers = readStorage(STORAGE_KEYS.USUARIOS, null);
+  if (storedUsers === null) {
+    localStorage.setItem(STORAGE_KEYS.USUARIOS, JSON.stringify(usuariosIniciales));
+  }
   carrito = readStorage(STORAGE_KEYS.CART, []);
 }
 
@@ -1023,10 +1015,11 @@ function renderUsuariosAdmin() {
   if (!tbody) return;
 
   const usuarios = readStorage(STORAGE_KEYS.USUARIOS, []);
-  tbody.innerHTML = usuarios.map((usuario) => `
+  const usuarioActual = getCurrentUser();
+  tbody.innerHTML = usuarios.length ? usuarios.map((usuario) => `
     <tr>
-      <td>${usuario.nombre}</td>
-      <td>${usuario.email}</td>
+      <td>${escapeHTML(usuario.nombre)}</td>
+      <td>${escapeHTML(usuario.email)}</td>
       <td>
         <select class="form-select form-select-sm" onchange="cambiarRolUsuario(${usuario.id}, this.value)">
           <option value="cliente" ${usuario.rol === 'cliente' ? 'selected' : ''}>Cliente</option>
@@ -1039,8 +1032,99 @@ function renderUsuariosAdmin() {
           ${usuario.activo ? 'Activo' : 'Desactivado'}
         </button>
       </td>
+      <td class="text-center">
+        <button class="btn btn-sm btn-outline-danger" onclick="eliminarUsuarioAdmin(${usuario.id})" ${Number(usuario.id) === Number(usuarioActual?.id) ? 'disabled title="No puedes eliminar tu propio usuario"' : ''}>
+          <i class="fa-solid fa-trash-can me-1"></i> Eliminar
+        </button>
+      </td>
     </tr>
-  `).join('');
+  `).join('') : '<tr><td colspan="5" class="text-center text-muted py-4">No hay usuarios registrados</td></tr>';
+}
+
+function crearUsuarioAdmin() {
+  Swal.fire({
+    title: 'Crear usuario',
+    html: `
+      <input id="swal-usuario-nombre" class="swal2-input" placeholder="Nombre completo" autocomplete="name">
+      <input id="swal-usuario-email" class="swal2-input" type="email" placeholder="Correo electrónico" autocomplete="email">
+      <input id="swal-usuario-password" class="swal2-input" type="password" placeholder="Contraseña" autocomplete="new-password">
+      <select id="swal-usuario-rol" class="form-select mt-3">
+        <option value="cliente">Cliente</option>
+        <option value="vendedor">Vendedor</option>
+        <option value="admin">Administrador</option>
+      </select>
+    `,
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonText: 'Crear usuario',
+    cancelButtonText: 'Cancelar',
+    preConfirm: () => {
+      const nombre = document.getElementById('swal-usuario-nombre').value.trim();
+      const email = document.getElementById('swal-usuario-email').value.trim();
+      const password = document.getElementById('swal-usuario-password').value;
+      const rol = document.getElementById('swal-usuario-rol').value;
+
+      if (!nombre || !email || !password) {
+        Swal.showValidationMessage('Completa todos los campos para crear el usuario.');
+        return false;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        Swal.showValidationMessage('Ingresa un correo electrónico válido.');
+        return false;
+      }
+      if (password.length < 6) {
+        Swal.showValidationMessage('La contraseña debe tener al menos 6 caracteres.');
+        return false;
+      }
+      if (readStorage(STORAGE_KEYS.USUARIOS, []).some((usuario) => usuario.email.toLowerCase() === email.toLowerCase())) {
+        Swal.showValidationMessage('Ya existe un usuario con ese correo electrónico.');
+        return false;
+      }
+
+      return { nombre, email, password, rol };
+    }
+  }).then((result) => {
+    if (!result.isConfirmed) return;
+
+    const usuarios = readStorage(STORAGE_KEYS.USUARIOS, []);
+    let nuevoId = Date.now();
+    while (usuarios.some((usuario) => Number(usuario.id) === nuevoId)) nuevoId += 1;
+    usuarios.push({ id: nuevoId, ...result.value, activo: true });
+    localStorage.setItem(STORAGE_KEYS.USUARIOS, JSON.stringify(usuarios));
+    renderUsuariosAdmin();
+    Swal.fire({ icon: 'success', title: 'Usuario creado', text: 'El usuario se agregó correctamente.', timer: 1800, showConfirmButton: false });
+  });
+}
+
+function eliminarUsuarioAdmin(id) {
+  const idUsuario = Number(id);
+  const usuarios = readStorage(STORAGE_KEYS.USUARIOS, []);
+  const usuario = usuarios.find((item) => Number(item.id) === idUsuario);
+  if (!usuario) return;
+
+  const usuarioActual = getCurrentUser();
+  if (Number(usuarioActual?.id) === idUsuario) {
+    Swal.fire({ icon: 'error', title: 'Acción no permitida', text: 'No puedes eliminar tu propio usuario mientras tienes la sesión iniciada.' });
+    return;
+  }
+
+  Swal.fire({
+    title: '¿Eliminar usuario?',
+    text: `Se eliminará la cuenta de ${usuario.nombre} (${usuario.email}).`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#dc3545',
+    cancelButtonColor: '#6c757d',
+    confirmButtonText: 'Sí, eliminar',
+    cancelButtonText: 'Cancelar'
+  }).then((result) => {
+    if (!result.isConfirmed) return;
+
+    const usuariosActualizados = readStorage(STORAGE_KEYS.USUARIOS, []).filter((item) => Number(item.id) !== idUsuario);
+    localStorage.setItem(STORAGE_KEYS.USUARIOS, JSON.stringify(usuariosActualizados));
+    renderUsuariosAdmin();
+    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Usuario eliminado', showConfirmButton: false, timer: 1500 });
+  });
 }
 
 function cambiarRolUsuario(id, nuevoRol) {
