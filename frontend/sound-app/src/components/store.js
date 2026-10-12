@@ -82,6 +82,17 @@ export function formatCLP(amount) {
   return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(amount) || 0);
 }
 
+/** Devuelve el precio de venta aplicando el descuento porcentual vigente. */
+export function getSalePrice(product) {
+  const discount = Math.min(99, Math.max(0, Number(product.descuento) || 0));
+  return Math.round(Number(product.precio) * (1 - discount / 100));
+}
+
+/** Convierte el nombre de una categoría en un segmento de ruta estable. */
+export function categorySlug(category) {
+  return category.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
 /** Presenta una notificación con SweetAlert2 o con el diálogo nativo disponible. */
 export function showMessage(options) {
   if (window.Swal) {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CATEGORIES, ROLES, confirmAction, createId, formatCLP, showMessage } from './store';
+import { CATEGORIES, ROLES, confirmAction, createId, formatCLP, getSalePrice, showMessage } from './store';
 
 const ORDER_STATUSES = ['En preparación', 'Despachado', 'Entregado'];
 const USER_ROLES = [
@@ -109,6 +109,12 @@ export default function AdminDashboard({ products, users, orders, currentUser, o
     onOrderStatus(orderId, event.target.value);
   }
 
+  /** Guarda el descuento porcentual de la oferta de un producto. */
+  function handleOfferSave(productId, discount) {
+    onProductsChange(products.map((product) => product.id === productId ? { ...product, descuento: discount } : product));
+    showMessage({ icon: 'success', title: discount ? 'Oferta actualizada' : 'Oferta eliminada', timer: 1500, showConfirmButton: false });
+  }
+
   /** Regresa a la tienda desde el panel de administración. */
   function handleStoreLink() {
     onNavigate('/');
@@ -138,6 +144,7 @@ export default function AdminDashboard({ products, users, orders, currentUser, o
 
       <ul className="nav nav-tabs admin-tabs mb-4" role="tablist" aria-label="Secciones administrativas">
         <TabButton tab="products" activeTab={activeTab} onSelect={handleTabChange} icon="fa-boxes-stacked">Productos</TabButton>
+        <TabButton tab="offers" activeTab={activeTab} onSelect={handleTabChange} icon="fa-tags">Ofertas</TabButton>
         <TabButton tab="users" activeTab={activeTab} onSelect={handleTabChange} icon="fa-users">Administración de Usuarios</TabButton>
         <TabButton tab="orders" activeTab={activeTab} onSelect={handleTabChange} icon="fa-truck-fast">Pedidos</TabButton>
       </ul>
@@ -167,6 +174,8 @@ export default function AdminDashboard({ products, users, orders, currentUser, o
       {activeTab === 'users' && (
         <UsersPanel users={users} currentUser={currentUser} onCreateUser={handleCreateUser} onDeleteUser={handleDeleteUser} onRoleChange={handleUserRoleChange} onStatusChange={handleUserStatusChange} />
       )}
+
+      {activeTab === 'offers' && <OffersPanel products={products} onSave={handleOfferSave} />}
 
       {activeTab === 'orders' && (
         <OrdersPanel orders={orders} onStatusChange={handleOrderStatusChange} />
@@ -385,6 +394,63 @@ function OrdersPanel({ orders, onStatusChange }) {
       </tbody>
     </table></div>
   </div></section>;
+}
+
+/** Permite configurar o quitar descuentos porcentuales por producto. */
+function OffersPanel({ products, onSave }) {
+  const activeOffers = products.filter((product) => Number(product.descuento) > 0).length;
+
+  return (
+    <section className="card border-0 shadow-sm rounded-4 mb-5" aria-label="Administración de ofertas">
+      <div className="card-body">
+        <h2 className="h4 fw-bold mb-1">Administración de ofertas</h2>
+        <p className="text-muted mb-3">Configura un descuento porcentual entre 0 y 99. Usa 0 para retirar una oferta.</p>
+        <p><strong>Ofertas activas:</strong> {activeOffers}</p>
+        <div className="table-responsive">
+          <table className="table table-hover align-middle">
+            <thead className="table-light"><tr><th>Producto</th><th>Precio normal</th><th>Oferta</th><th>Precio rebajado</th><th>Acción</th></tr></thead>
+            <tbody>
+              {products.map((product) => <OfferRow key={product.id} product={product} onSave={onSave} />)}
+              {!products.length && <tr><td colSpan="5" className="text-center text-muted py-4">No hay productos para configurar ofertas.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** Edita el descuento de un producto y previsualiza el precio resultante. */
+function OfferRow({ product, onSave }) {
+  const [discount, setDiscount] = useState(String(Number(product.descuento) || 0));
+  const parsedDiscount = Number(discount);
+  const validDiscount = Number.isInteger(parsedDiscount) && parsedDiscount >= 0 && parsedDiscount <= 99;
+  const previewProduct = { ...product, descuento: validDiscount ? parsedDiscount : 0 };
+
+  /** Valida y persiste el descuento configurado para este producto. */
+  function handleSave() {
+    if (!validDiscount) {
+      showMessage({ icon: 'error', title: 'Descuento inválido', text: 'Ingresa un porcentaje entero entre 0 y 99.' });
+      return;
+    }
+    onSave(product.id, parsedDiscount);
+  }
+
+  return (
+    <tr>
+      <td>{product.nombre}</td>
+      <td>{formatCLP(product.precio)}</td>
+      <td>
+        <div className="d-flex align-items-center gap-2">
+          <label className="visually-hidden" htmlFor={`offer-${product.id}`}>Descuento para {product.nombre}</label>
+          <input id={`offer-${product.id}`} className="form-control form-control-sm" type="number" min="0" max="99" step="1" value={discount} onChange={(event) => setDiscount(event.target.value)} aria-label={`Descuento para ${product.nombre}`} />
+          <span>%</span>
+        </div>
+      </td>
+      <td>{validDiscount ? formatCLP(getSalePrice(previewProduct)) : '—'}</td>
+      <td><button type="button" className="btn btn-sm btn-outline-primary" disabled={!validDiscount} onClick={handleSave}>Guardar oferta</button></td>
+    </tr>
+  );
 }
 
 /** Resume un pedido y ofrece el selector de estado de administración. */

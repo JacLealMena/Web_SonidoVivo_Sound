@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import AdminDashboard from './AdminDashboard';
 import AuthPages from './AuthPages';
+import CheckoutResult from './CheckoutResult';
 import Navbar from './navbar';
 import OrdersPage from './OrdersPage';
+import { CategoriesPage, CategoryProductsPage, OffersPage, ProductDetailPage } from './ProductPages';
 import SellerDashboard from './SellerDashboard';
 import Storefront from './Storefront';
-import { DEFAULT_PRODUCTS, DEFAULT_USERS, ROLES, STORAGE_KEYS, createId, readStorage, showMessage, writeStorage } from './store';
+import { CATEGORIES, DEFAULT_PRODUCTS, DEFAULT_USERS, ROLES, STORAGE_KEYS, categorySlug, createId, getSalePrice, readStorage, showMessage, writeStorage } from './store';
 
 /** Coordina rutas, sesión y estado compartido de la tienda React. */
 export default function App() {
@@ -125,8 +127,8 @@ export default function App() {
       return;
     }
     setCart(cartItem
-      ? cart.map((item) => item.id === selectedProduct.id ? { ...item, cantidad: item.cantidad + 1 } : item)
-      : [...cart, { ...selectedProduct, cantidad: 1 }]);
+      ? cart.map((item) => item.id === selectedProduct.id ? { ...item, precioOriginal: selectedProduct.precio, precio: getSalePrice(selectedProduct), cantidad: item.cantidad + 1 } : item)
+      : [...cart, { ...selectedProduct, precioOriginal: selectedProduct.precio, precio: getSalePrice(selectedProduct), cantidad: 1 }]);
   }
 
   /** Actualiza la cantidad de un producto del carrito y evita exceder el stock. */
@@ -154,35 +156,53 @@ export default function App() {
   /** Registra un pedido, rebaja el inventario y vacía el carrito. */
   function handleCheckout(checkoutData) {
     if (!currentUser) {
-      showMessage({ icon: 'info', title: 'Inicia sesión', text: 'Necesitas una cuenta para confirmar tu pedido.' }).then(() => navigate('/login'));
-      return;
+      navigate('/login');
+      return { success: false, error: 'Inicia sesión para confirmar tu pedido.' };
     }
     if (!cart.length) {
-      showMessage({ icon: 'info', title: 'Carrito vacío', text: 'Agrega al menos un producto antes de pagar.' });
-      return;
+      return { success: false, error: 'Agrega al menos un producto antes de confirmar tu pedido.' };
+    }
+
+    const contact = {
+      nombre: checkoutData.name.trim(),
+      telefono: checkoutData.phone.trim(),
+      email: checkoutData.email.trim()
+    };
+    if (!contact.nombre || !contact.telefono || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) {
+      return { success: false, error: 'Revisa tu nombre, teléfono y correo electrónico antes de confirmar.' };
+    }
+    if (checkoutData.entrega !== 'retiro' && checkoutData.entrega !== 'despacho') {
+      return { success: false, error: 'Selecciona un método de entrega válido.' };
+    }
+    if (checkoutData.entrega === 'despacho' && !checkoutData.direccion.trim()) {
+      return { success: false, error: 'Ingresa una dirección válida para el despacho.' };
     }
 
     const unavailableItem = cart.find((item) => {
       const product = products.find((storedProduct) => storedProduct.id === item.id);
-      return !product || item.cantidad > product.stock;
+      return !product || !Number.isInteger(item.cantidad) || item.cantidad < 1 || item.cantidad > product.stock;
     });
     if (unavailableItem) {
-      showMessage({ icon: 'error', title: 'Stock insuficiente', text: `${unavailableItem.nombre} ya no tiene suficientes unidades disponibles.` });
-      return;
+      return { success: false, error: `Stock insuficiente para ${unavailableItem.nombre}. Ajusta la cantidad antes de volver a confirmar.` };
     }
 
     const timestamp = Date.now();
+    const orderItems = cart.map((item) => {
+      const product = products.find((storedProduct) => storedProduct.id === item.id);
+      return { id: product.id, nombre: product.nombre, precio: getSalePrice(product), precioOriginal: product.precio, descuento: Number(product.descuento) || 0, cantidad: item.cantidad };
+    });
     const order = {
       id: timestamp,
       numero: `PED-${String(timestamp).slice(-6)}`,
       clienteId: currentUser.id,
       clienteNombre: currentUser.nombre,
-      email: currentUser.email,
+      email: contact.email,
+      contacto: contact,
       fecha: new Date().toISOString(),
-      items: cart.map((item) => ({ id: item.id, nombre: item.nombre, precio: item.precio, cantidad: item.cantidad })),
+      items: orderItems,
       entrega: checkoutData.entrega,
       direccion: checkoutData.entrega === 'despacho' ? checkoutData.direccion : 'Retiro en tienda: Av. Concha y Toro 1234, Puente Alto',
-      total: cart.reduce((total, item) => total + item.precio * item.cantidad, 0),
+      total: orderItems.reduce((total, item) => total + item.precio * item.cantidad, 0),
       estado: 'En preparación'
     };
 
@@ -192,7 +212,8 @@ export default function App() {
       return cartItem ? { ...product, stock: product.stock - cartItem.cantidad } : product;
     }));
     setCart([]);
-    showMessage({ icon: 'success', title: 'Compra confirmada', text: `Tu pedido ${order.numero} fue registrado correctamente.` }).then(() => navigate('/orders'));
+    navigate(`/checkout/success/${order.id}`);
+    return { success: true };
   }
 
   /** Actualiza un pedido existente después de validar el nuevo estado. */
@@ -224,12 +245,30 @@ export default function App() {
       return <SellerDashboard products={products} orders={orders} onProductsChange={handleProductsChange} onOrderStatus={handleOrderStatus} onNavigate={navigate} onLogout={handleLogout} />;
     }
     if (path === '/orders') return <OrdersPage currentUser={currentUser} orders={orders} onNavigate={navigate} />;
+    if (path === '/categories') return <CategoriesPage products={products} onNavigate={navigate} />;
+    if (path === '/offers') return <OffersPage products={products} onAddToCart={handleAddToCart} onNavigate={navigate} />;
+    const categoryMatch = path.match(/^\/categories\/([a-z0-9-]+)$/);
+    if (categoryMatch) {
+      const category = CATEGORIES.find((item) => categorySlug(item) === categoryMatch[1]);
+      if (category) return <CategoryProductsPage category={category} products={products} onAddToCart={handleAddToCart} onNavigate={navigate} />;
+      return <CategoriesPage products={products} onNavigate={navigate} />;
+    }
+    const productMatch = path.match(/^\/products\/(\d+)$/);
+    if (productMatch) {
+      const product = products.find((item) => Number(item.id) === Number(productMatch[1]));
+      return <ProductDetailPage product={product} onAddToCart={handleAddToCart} onNavigate={navigate} />;
+    }
+    const completedOrderMatch = path.match(/^\/checkout\/success\/(\d+)$/);
+    if (completedOrderMatch) {
+      const completedOrder = orders.find((order) => String(order.id) === completedOrderMatch[1] && Number(order.clienteId) === Number(currentUser?.id));
+      return <CheckoutResult order={completedOrder} onNavigate={navigate} />;
+    }
     return <Storefront products={products} cart={cart} currentUser={currentUser} searchQuery={searchQuery} onSearch={setSearchQuery} onAddToCart={handleAddToCart} onCartQuantity={handleCartQuantity} onRemoveFromCart={handleRemoveFromCart} onCheckout={handleCheckout} onNavigate={navigate} />;
   }
 
   return (
     <>
-      {showNavbar && <Navbar currentUser={currentUser} cart={cart} isStorefront={path === '/'} searchQuery={searchQuery} onSearch={setSearchQuery} onNavigate={navigate} onLogout={handleLogout} />}
+      {showNavbar && <Navbar currentUser={currentUser} cart={cart} isStorefront={path === '/'} showCatalogLinks={path !== '/admin' && path !== '/seller' && path !== '/login' && path !== '/register' && path !== '/orders' && !path.startsWith('/checkout/')} searchQuery={searchQuery} onSearch={setSearchQuery} onNavigate={navigate} onLogout={handleLogout} />}
       {page}
     </>
   );
@@ -243,5 +282,12 @@ function normalizePath(pathname) {
   if (route.endsWith('/login') || route.endsWith('/login.html')) return '/login';
   if (route.endsWith('/register') || route.endsWith('/registro.html')) return '/register';
   if (route.endsWith('/orders') || route.endsWith('/mis-pedidos.html')) return '/orders';
+  if (route === '/categories' || route === '/offers') return route;
+  const categoryPath = route.match(/^\/categories\/([a-z0-9-]+)$/);
+  if (categoryPath) return `/categories/${categoryPath[1]}`;
+  const productPath = route.match(/^\/products\/(\d+)$/);
+  if (productPath) return `/products/${productPath[1]}`;
+  const successfulCheckout = route.match(/\/checkout\/success\/(\d+)$/);
+  if (successfulCheckout) return `/checkout/success/${successfulCheckout[1]}`;
   return '/';
 }

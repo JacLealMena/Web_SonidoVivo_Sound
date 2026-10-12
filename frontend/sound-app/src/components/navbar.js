@@ -12,7 +12,7 @@ function NavAction({ to, onNavigate, children, className = 'nav-link text-white 
 }
 
 /** Muestra la barra de navegación y los accesos relevantes para la sesión actual. */
-export default function Navbar({ currentUser, cart, isStorefront, searchQuery, onSearch, onNavigate, onLogout }) {
+export default function Navbar({ currentUser, cart, isStorefront, showCatalogLinks = false, searchQuery, onSearch, onNavigate, onLogout }) {
   const cartCount = cart.reduce((total, item) => total + item.cantidad, 0);
   const homeTarget = currentUser?.rol === ROLES.ADMIN ? '/admin' : currentUser?.rol === ROLES.SELLER ? '/seller' : '/';
 
@@ -51,6 +51,13 @@ export default function Navbar({ currentUser, cart, isStorefront, searchQuery, o
             </form>
           )}
           <ul className="navbar-nav ms-auto align-items-lg-center gap-2">
+            {showCatalogLinks && (
+              <>
+                <li className="nav-item"><NavAction to="/" onNavigate={onNavigate}>Catálogo</NavAction></li>
+                <li className="nav-item"><NavAction to="/categories" onNavigate={onNavigate}>Categorías</NavAction></li>
+                <li className="nav-item"><NavAction to="/offers" onNavigate={onNavigate}>Ofertas</NavAction></li>
+              </>
+            )}
             {!currentUser && (
               <>
                 <li className="nav-item">

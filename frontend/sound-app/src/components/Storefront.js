@@ -1,21 +1,31 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CATEGORIES, formatCLP, showMessage } from './store';
+import CatalogProductCard from './CatalogProductCard';
+import { CheckoutError } from './CheckoutResult';
+import { CATEGORIES, formatCLP, getSalePrice, showMessage } from './store';
 
 /** Muestra catálogo, filtros, carrito y formulario de compra de la tienda. */
 export default function Storefront({ products, cart, currentUser, searchQuery, onAddToCart, onCartQuantity, onRemoveFromCart, onCheckout, onNavigate }) {
   const [category, setCategory] = useState('Todos');
   const [delivery, setDelivery] = useState('retiro');
   const [checkoutData, setCheckoutData] = useState({ name: currentUser?.nombre || '', phone: '', email: currentUser?.email || '', address: '' });
+  const [checkoutError, setCheckoutError] = useState('');
   const filteredProducts = useMemo(() => products.filter((product) => {
     const matchesCategory = category === 'Todos' || product.categoria === category;
     const matchesSearch = product.nombre.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   }), [category, products, searchQuery]);
   const cartCount = cart.reduce((total, item) => total + item.cantidad, 0);
-  const cartTotal = cart.reduce((total, item) => total + item.precio * item.cantidad, 0);
+  const displayedCart = cart.map((item) => {
+    const currentProduct = products.find((product) => product.id === item.id);
+    return currentProduct
+      ? { ...currentProduct, precioOriginal: currentProduct.precio, precio: getSalePrice(currentProduct), cantidad: item.cantidad }
+      : item;
+  });
+  const cartTotal = displayedCart.reduce((total, item) => total + item.precio * item.cantidad, 0);
 
   /** Abre el checkout después de confirmar que el carrito se puede pagar. */
   function handleOpenCheckout() {
+    setCheckoutError('');
     if (!cart.length) {
       showMessage({ icon: 'info', title: 'Carrito vacío', text: 'Agrega al menos un producto antes de proceder al pago.' });
       return;
@@ -39,12 +49,34 @@ export default function Storefront({ products, cart, currentUser, searchQuery, o
   /** Guarda el pedido y cierra el checkout si todos sus datos son válidos. */
   function handleCheckoutSubmit(event) {
     event.preventDefault();
-    if (delivery === 'despacho' && !checkoutData.address.trim()) {
-      showMessage({ icon: 'error', title: 'Falta la dirección', text: 'Ingresa la dirección para el despacho.' });
+    if (!checkoutData.name.trim() || !checkoutData.phone.trim() || !checkoutData.email.trim()) {
+      setCheckoutError('Completa tu nombre, teléfono y correo electrónico.');
       return;
     }
-    onCheckout({ ...checkoutData, entrega: delivery, direccion: checkoutData.address.trim() });
+    if (delivery === 'despacho' && !checkoutData.address.trim()) {
+      setCheckoutError('Ingresa una dirección válida para el despacho.');
+      return;
+    }
+    const result = onCheckout({
+      ...checkoutData,
+      name: checkoutData.name.trim(),
+      phone: checkoutData.phone.trim(),
+      email: checkoutData.email.trim(),
+      entrega: delivery,
+      direccion: checkoutData.address.trim()
+    });
+    if (!result?.success) {
+      setCheckoutError(result?.error || 'No pudimos confirmar tu pedido. Revisa los datos e inténtalo nuevamente.');
+      return;
+    }
     window.bootstrap?.Modal.getInstance(document.getElementById('checkoutModal'))?.hide();
+  }
+
+  /** Explica por qué el navegador no permite enviar un formulario incompleto. */
+  function handleCheckoutInvalid(event) {
+    setCheckoutError(event.target.name === 'address'
+      ? 'Ingresa una dirección válida para el despacho.'
+      : 'Completa los datos personales requeridos antes de confirmar.');
   }
 
   return (
@@ -65,7 +97,7 @@ export default function Storefront({ products, cart, currentUser, searchQuery, o
 
         <div className="row row-cols-1 row-cols-sm-2 row-cols-lg-3 row-cols-xl-4 g-4">
           {filteredProducts.length ? filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} onAddToCart={onAddToCart} />
+            <CatalogProductCard key={product.id} product={product} onAddToCart={onAddToCart} onNavigate={onNavigate} />
           )) : <div className="col-12 text-center py-5"><i className="fa-solid fa-box-open fa-3x text-muted mb-3" /><h5 className="text-muted">No se encontraron productos.</h5></div>}
         </div>
 
@@ -83,7 +115,7 @@ export default function Storefront({ products, cart, currentUser, searchQuery, o
         </div>
         <div className="offcanvas-body d-flex flex-column">
           <div className="flex-grow-1 overflow-auto">
-            {cart.length ? cart.map((item) => (
+            {displayedCart.length ? displayedCart.map((item) => (
               <CartItem key={item.id} item={item} onCartQuantity={onCartQuantity} onRemoveFromCart={onRemoveFromCart} />
             )) : <p className="text-center text-muted py-4">El carrito está vacío</p>}
           </div>
@@ -103,8 +135,9 @@ export default function Storefront({ products, cart, currentUser, searchQuery, o
               <h5 className="modal-title fw-bold" id="checkoutModalLabel"><i className="fa-solid fa-credit-card me-2" />Finalizar Compra</h5>
               <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar" />
             </div>
-            <form onSubmit={handleCheckoutSubmit}>
+            <form onSubmit={handleCheckoutSubmit} onInvalid={handleCheckoutInvalid}>
               <div className="modal-body p-4">
+                {checkoutError && <CheckoutError message={checkoutError} />}
                 <h6 className="fw-bold mb-3 text-primary">1. Datos Personales</h6>
                 <div className="row g-3 mb-4">
                   <label className="col-md-6">Nombre Completo<input className="form-control mt-1" name="name" value={checkoutData.name} onChange={handleCheckoutFieldChange} required /></label>
@@ -165,38 +198,6 @@ function CategoryButton({ category, selectedCategory, onSelect }) {
   return <button type="button" className={`btn rounded-pill px-3 ${selectedCategory === category ? 'btn-dark' : 'btn-outline-dark'}`} onClick={handleSelectCategory}>{category}</button>;
 }
 
-/** Presenta la información de un producto y permite agregarlo al carrito. */
-function ProductCard({ product, onAddToCart }) {
-  const outOfStock = product.stock === 0;
-  const lowStock = product.stock > 0 && product.stock <= 3;
-
-  /** Agrega el producto a la compra actual. */
-  function handleAdd() {
-    onAddToCart(product.id);
-  }
-
-  return (
-    <div className="col d-flex align-items-stretch">
-      <article className="card product-card shadow-sm border-0 position-relative w-100">
-        {outOfStock && <span className="badge bg-danger position-absolute top-0 start-0 m-2">Agotado</span>}
-        {lowStock && <span className="badge bg-warning text-dark position-absolute top-0 start-0 m-2">¡Últimas {product.stock} un!</span>}
-        <img src={product.imagen} className="card-img-top p-3 product-image" alt={product.nombre} />
-        <div className="card-body d-flex flex-column">
-          <span className="badge bg-secondary mb-2 align-self-start">{product.categoria}</span>
-          <h2 className="card-title text-dark fw-bold mb-2 h6">{product.nombre}</h2>
-          <p className="card-text mb-3 small">
-            {outOfStock ? <span className="text-danger fw-bold">Sin stock disponible</span> : lowStock ? <span className="text-warning-emphasis fw-bold">Quedan solo {product.stock} unidades</span> : <span className="text-muted">Stock: {product.stock} un.</span>}
-          </p>
-          <div className="mt-auto d-flex align-items-center justify-content-between gap-2">
-            <span className="fs-5 fw-bold text-success">{formatCLP(product.precio)}</span>
-            <button type="button" className="btn btn-primary btn-sm px-3" onClick={handleAdd} disabled={outOfStock}><i className="fa-solid fa-cart-plus me-1" />Agregar</button>
-          </div>
-        </div>
-      </article>
-    </div>
-  );
-}
-
 /** Muestra un artículo del carrito con ajuste de cantidad y opción para quitarlo. */
 function CartItem({ item, onCartQuantity, onRemoveFromCart }) {
   /** Reduce una unidad de este artículo del carrito. */
@@ -220,6 +221,7 @@ function CartItem({ item, onCartQuantity, onRemoveFromCart }) {
         <img src={item.imagen} className="cart-item-image" alt="" />
         <div>
           <h6 className="mb-0 fs-6 fw-semibold">{item.nombre}</h6>
+          {item.precioOriginal > item.precio && <small className="text-muted d-block"><del>{formatCLP(item.precioOriginal)}</del></small>}
           <small className="text-muted">{formatCLP(item.precio)} c/u</small>
           <div className="d-flex align-items-center gap-2 mt-1">
             <button type="button" className="btn btn-sm btn-outline-secondary py-0 px-2" onClick={handleDecrease} aria-label={`Quitar una unidad de ${item.nombre}`}>-</button>

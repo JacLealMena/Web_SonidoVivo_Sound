@@ -56,14 +56,25 @@ function OrderCard({ order }) {
                 {/* Desglosa cada artículo registrado en el pedido. */}
                 {order.items.map((item) => (
                   <tr key={`${order.id}-${item.id}`}>
-                    <td>{item.nombre}</td><td>{item.cantidad}</td><td>{formatCLP(item.precio)}</td><td>{formatCLP(item.precio * item.cantidad)}</td>
+                    <td>{item.nombre}</td>
+                    <td>{item.cantidad}</td>
+                    <td>
+                      {item.precioOriginal > item.precio && <del className="d-block text-muted small">{formatCLP(item.precioOriginal)}</del>}
+                      {formatCLP(item.precio)}
+                      {item.descuento > 0 && <small className="d-block text-success">{item.descuento}% de descuento</small>}
+                    </td>
+                    <td>{formatCLP(item.precio * item.cantidad)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           <div className="d-flex justify-content-between align-items-center flex-wrap gap-3 mt-3 border-top pt-3">
-            <div><small className="text-muted d-block">Entrega: {order.entrega}</small><small className="text-muted">Dirección: {order.direccion}</small></div>
+            <div>
+              <small className="text-muted d-block">Entrega: {order.entrega}</small>
+              <small className="text-muted d-block">Dirección: {order.direccion}</small>
+              {order.contacto && <small className="text-muted">Contacto: {order.contacto.nombre} · {order.contacto.telefono} · {order.contacto.email}</small>}
+            </div>
             <h3 className="h5 fw-bold text-success mb-0">{formatCLP(order.total)}</h3>
           </div>
         </div>

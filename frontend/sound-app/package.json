@@ -15,7 +15,7 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "test": "react-scripts test",
+    "test": "karma start karma.conf.js --single-run",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
@@ -35,5 +35,12 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "jasmine-core": "^7.0.2",
+    "karma": "^6.4.4",
+    "karma-jasmine": "^5.1.0",
+    "karma-jsdom-launcher": "^22.0.0",
+    "karma-webpack": "^5.0.1"
   }
 }

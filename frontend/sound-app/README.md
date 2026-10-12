@@ -15,10 +15,10 @@ Create React App inicia el servidor de desarrollo en `http://localhost:3000`.
 
 ## Funcionalidades
 
-- Catálogo con búsqueda, categorías, inventario y carrito.
-- Checkout con retiro en tienda o despacho, registro de pedidos y descuento de stock.
+- Catálogo con búsqueda, páginas de categorías, ofertas y detalle de producto, inventario y carrito.
+- Checkout con validación de datos y entrega, confirmación con resumen del pedido y manejo visible de errores de stock; los pedidos y el inventario quedan actualizados al confirmar la compra.
 - Registro, acceso y navegación según el rol de cliente, vendedor o administrador.
-- Panel del administrador con pestañas de productos, usuarios y pedidos.
+- Panel del administrador para productos, descuentos porcentuales, usuarios y pedidos.
 - Panel de vendedor con inventario, alertas de stock y seguimiento de pedidos.
 - Pedidos, productos, usuarios, carrito y sesión guardados en `localStorage`.
 
@@ -27,8 +27,10 @@ La aplicación incluye cuentas de demostración iniciales: `admin@sonidovivo.cl`
 ## Validar y compilar
 
 ```bash
-npm test -- --watchAll=false
+npm test
 npm run build
 ```
+
+Las pruebas unitarias del frontend usan Jasmine y Karma con jsdom.
 
 Bootstrap, Font Awesome, SweetAlert2 y Leaflet se cargan desde sus CDNs en `public/index.html`.
