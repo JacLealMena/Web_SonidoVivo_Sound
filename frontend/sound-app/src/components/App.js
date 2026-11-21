@@ -7,15 +7,15 @@ import OrdersPage from './OrdersPage';
 import { CategoriesPage, CategoryProductsPage, OffersPage, ProductDetailPage } from './ProductPages';
 import SellerDashboard from './SellerDashboard';
 import Storefront from './Storefront';
-import { CATEGORIES, DEFAULT_PRODUCTS, DEFAULT_USERS, ROLES, STORAGE_KEYS, categorySlug, createId, getSalePrice, readStorage, showMessage, writeStorage } from './store';
+import { CATEGORIES, ROLES, STORAGE_KEYS, categorySlug, getSalePrice, readStorage, showMessage, writeStorage } from './store';
+import { AuthService } from '../services/AuthService';
+import { ProductService } from '../services/ProductService';
+import { UserService } from '../services/UserService';
 
 /** Coordina rutas, sesión y estado compartido de la tienda React. */
 export default function App() {
-  const [products, setProducts] = useState(() => readStorage(STORAGE_KEYS.PRODUCTS, DEFAULT_PRODUCTS));
-  const [users, setUsers] = useState(() => {
-    const savedUsers = readStorage(STORAGE_KEYS.USERS, null);
-    return savedUsers === null ? DEFAULT_USERS : savedUsers;
-  });
+  const [products, setProducts] = useState([]);
+  const [users, setUsers] = useState([]);
   const [orders, setOrders] = useState(() => readStorage(STORAGE_KEYS.ORDERS, []));
   const [cart, setCart] = useState(() => readStorage(STORAGE_KEYS.CART, []));
   const [currentUser, setCurrentUser] = useState(() => readStorage(STORAGE_KEYS.CURRENT_USER, null));
@@ -23,12 +23,14 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    writeStorage(STORAGE_KEYS.PRODUCTS, products);
-  }, [products]);
+    reloadProducts();
+  }, []);
 
   useEffect(() => {
-    writeStorage(STORAGE_KEYS.USERS, users);
-  }, [users]);
+    if (currentUser?.rol === ROLES.ADMIN) {
+      reloadUsers();
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     writeStorage(STORAGE_KEYS.ORDERS, orders);
@@ -77,47 +79,66 @@ export default function App() {
   }
 
   /** Autentica una cuenta activa y la dirige a la vista apropiada para su rol. */
-  function handleLogin(email, password) {
-    const matchedUser = users.find((user) => user.email.toLowerCase() === email.trim().toLowerCase() && user.password === password && user.activo);
-    if (!matchedUser) {
+  async function handleLogin(email, password) {
+    try {
+      const auth = await AuthService.login(email, password);
+      window.localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, auth.token);
+      setCurrentUser(auth.usuario);
+      navigate(auth.usuario.rol === ROLES.ADMIN ? '/admin' : auth.usuario.rol === ROLES.SELLER ? '/seller' : '/');
+    } catch (error) {
       showMessage({ icon: 'error', title: 'Credenciales inválidas', text: 'Revisa tu correo y contraseña, o verifica que tu cuenta esté activa.' });
-      return;
     }
-
-    setCurrentUser(matchedUser);
-    navigate(matchedUser.rol === ROLES.ADMIN ? '/admin' : matchedUser.rol === ROLES.SELLER ? '/seller' : '/');
   }
 
   /** Registra una cuenta de cliente tras validar los datos y el correo único. */
-  function handleRegister(formData) {
-    if (users.some((user) => user.email.toLowerCase() === formData.email.trim().toLowerCase())) {
-      showMessage({ icon: 'error', title: 'Correo ya registrado', text: 'Ya existe una cuenta con ese correo.' });
-      return;
-    }
+  async function handleRegister(formData) {
     if (formData.password.length < 6) {
       showMessage({ icon: 'error', title: 'Contraseña muy corta', text: 'La contraseña debe tener al menos 6 caracteres.' });
       return;
     }
-
-    setUsers((existingUsers) => [...existingUsers, {
-      id: createId(existingUsers),
-      nombre: formData.nombre.trim(),
-      email: formData.email.trim(),
-      password: formData.password,
-      rol: ROLES.CUSTOMER,
-      activo: true
-    }]);
-    showMessage({ icon: 'success', title: 'Cuenta creada', text: 'Tu cuenta está lista. Inicia sesión para comprar.' }).then(() => navigate('/login'));
+    try {
+      await AuthService.register(formData);
+      showMessage({ icon: 'success', title: 'Cuenta creada', text: 'Tu cuenta está lista. Inicia sesión para comprar.' }).then(() => navigate('/login'));
+    } catch (error) {
+      const message = error.response?.data?.mensaje || 'No se pudo crear la cuenta.';
+      showMessage({ icon: 'error', title: 'Registro no completado', text: message });
+    }
   }
 
   /** Cierra la sesión activa y vuelve a la tienda principal. */
   function handleLogout() {
     setCurrentUser(null);
+    window.localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
     navigate('/');
+  }
+
+  /** Carga el catálogo desde el microservicio de productos. */
+  async function reloadProducts() {
+    try {
+      const loadedProducts = await ProductService.getProducts();
+      setProducts(loadedProducts);
+    } catch (error) {
+      console.error('No se pudo cargar el catálogo desde el backend.', error);
+    }
+  }
+
+  /** Carga las cuentas desde el microservicio protegido de usuarios. */
+  async function reloadUsers() {
+    try {
+      const loadedUsers = await UserService.getUsers();
+      setUsers(loadedUsers);
+    } catch (error) {
+      console.error('No se pudo cargar la lista de usuarios.', error);
+    }
   }
 
   /** Añade al carrito una unidad del producto seleccionado si hay stock. */
   function handleAddToCart(productId) {
+    if (!currentUser) {
+      navigate('/login');
+      showMessage({ icon: 'info', title: 'Inicia sesión', text: 'Necesitas una cuenta para agregar productos al carrito.' });
+      return;
+    }
     const selectedProduct = products.find((product) => product.id === Number(productId));
     if (!selectedProduct || selectedProduct.stock < 1) return;
 
@@ -222,13 +243,64 @@ export default function App() {
   }
 
   /** Guarda los cambios hechos desde los paneles de administración e inventario. */
-  function handleProductsChange(nextProducts) {
+  async function handleProductsChange(nextProducts) {
     setProducts(nextProducts);
+    try {
+      const deletedProducts = products.filter((product) => !nextProducts.some((nextProduct) => nextProduct.id === product.id));
+      for (const deletedProduct of deletedProducts) {
+        await ProductService.deleteProduct(deletedProduct.id);
+      }
+
+      for (const nextProduct of nextProducts) {
+        const storedProduct = products.find((product) => product.id === nextProduct.id);
+        if (!storedProduct) {
+          await ProductService.createProduct(nextProduct);
+        } else if (JSON.stringify(storedProduct) !== JSON.stringify(nextProduct)) {
+          await ProductService.updateProduct(nextProduct.codigo, nextProduct);
+        }
+      }
+      await reloadProducts();
+    } catch (error) {
+      console.error('No se pudo sincronizar el producto con el backend.', error);
+      showMessage({ icon: 'error', title: 'No se pudo guardar', text: 'Revisa tu sesión y vuelve a intentarlo.' });
+      await reloadProducts();
+    }
   }
 
   /** Actualiza las cuentas administradas por el panel de usuarios. */
-  function handleUsersChange(nextUsers) {
+  async function handleUsersChange(nextUsers) {
     setUsers(nextUsers);
+    try {
+      const deletedUsers = users.filter((user) => !nextUsers.some((nextUser) => nextUser.id === user.id));
+      for (const deletedUser of deletedUsers) {
+        await UserService.deleteUser(deletedUser.id);
+      }
+
+      for (const nextUser of nextUsers) {
+        const storedUser = users.find((user) => user.id === nextUser.id);
+        if (!storedUser) {
+          await UserService.createUser({
+            nombre: nextUser.nombre,
+            email: nextUser.email,
+            password: nextUser.password,
+            rol: nextUser.rol,
+            activo: nextUser.activo
+          });
+        } else if (JSON.stringify(storedUser) !== JSON.stringify(nextUser)) {
+          await UserService.updateUser(nextUser.id, {
+            nombre: nextUser.nombre,
+            email: nextUser.email,
+            rol: nextUser.rol,
+            activo: nextUser.activo
+          });
+        }
+      }
+      await reloadUsers();
+    } catch (error) {
+      console.error('No se pudo sincronizar el usuario con el backend.', error);
+      showMessage({ icon: 'error', title: 'No se pudo guardar', text: 'Revisa tu sesión y vuelve a intentarlo.' });
+      await reloadUsers();
+    }
   }
 
   const showNavbar = path !== '/login' && path !== '/register';

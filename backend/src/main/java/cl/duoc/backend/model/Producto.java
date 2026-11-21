@@ -4,6 +4,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -18,6 +20,7 @@ import lombok.NoArgsConstructor;
 public class Producto {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     public Long id;
 
     @Column(nullable = false)
@@ -25,6 +28,12 @@ public class Producto {
 
     @Column(nullable = false)
     public String nombre;
+
+    @Column(nullable = true)
+    public String marca;
+
+    @Column(nullable = true)
+    public String modelo;
 
     @Column(nullable = false) 
     @Enumerated(EnumType.STRING)

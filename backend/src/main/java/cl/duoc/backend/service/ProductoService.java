@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import cl.duoc.backend.model.EnumCategoria;
 import cl.duoc.backend.model.Producto;
@@ -60,15 +61,20 @@ public class ProductoService {
     }
 
     // Actualizar Todo
+    @Transactional
     public Producto actualizarProducto(Producto producto, String codigo){
         Producto productoActualizado = productoRepository.findByCodigo(codigo);
-
-        if (productoActualizado == null) {
-            return null;
-        }else{
-            productoActualizado.setId(producto.getId());
-        }
-
+        if (productoActualizado == null) return null;
+        productoActualizado.setCodigo(producto.getCodigo());
+        productoActualizado.setNombre(producto.getNombre());
+        productoActualizado.setMarca(producto.getMarca());
+        productoActualizado.setModelo(producto.getModelo());
+        productoActualizado.setCategoria(producto.getCategoria());
+        productoActualizado.setDescripcion(producto.getDescripcion());
+        productoActualizado.setPrecio(producto.getPrecio());
+        productoActualizado.setStock(producto.getStock());
+        productoActualizado.setStockCritico(producto.getStockCritico());
+        productoActualizado.setImagen(producto.getImagen());
         return productoActualizado;
     }
 

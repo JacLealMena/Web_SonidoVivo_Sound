@@ -4,6 +4,8 @@ import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.transaction.annotation.Transactional;
 
 import cl.duoc.backend.model.EnumCategoria;
 import cl.duoc.backend.model.Producto;
@@ -22,6 +24,8 @@ public interface ProductoRepository extends JpaRepository<Producto,Long> {
     public Producto findByCodigo(String codigo);
 
     // Eliminar
+    @Transactional
+    @Modifying
     public void deleteByCodigo(String codigo);
 
 }

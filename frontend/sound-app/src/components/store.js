@@ -3,7 +3,8 @@ export const STORAGE_KEYS = {
   USERS: 'sonidoVivo_usuarios',
   CART: 'sonidoVivo_cart',
   ORDERS: 'sonidoVivo_pedidos',
-  CURRENT_USER: 'sonidoVivo_currentUser'
+  CURRENT_USER: 'sonidoVivo_currentUser',
+  AUTH_TOKEN: 'sonidoVivo_authToken'
 };
 
 export const ROLES = {

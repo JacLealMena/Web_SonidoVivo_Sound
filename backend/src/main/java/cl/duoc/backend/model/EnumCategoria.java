@@ -1,6 +1,7 @@
 package cl.duoc.backend.model;
 
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.annotation.JsonCreator;
 
 public enum EnumCategoria {
 
@@ -24,5 +25,19 @@ public enum EnumCategoria {
     @JsonValue
     public String getCategoria() {
         return categoria;
+    }
+
+    @JsonCreator
+    public static EnumCategoria fromValue(String valor) {
+        if (valor == null) {
+            return null;
+        }
+        for (EnumCategoria categoria : values()) {
+            if (categoria.categoria.equalsIgnoreCase(valor.trim())
+                    || categoria.name().equalsIgnoreCase(valor.trim())) {
+                return categoria;
+            }
+        }
+        throw new IllegalArgumentException("Categoria no valida: " + valor);
     }
 }

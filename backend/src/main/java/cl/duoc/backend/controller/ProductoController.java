@@ -7,11 +7,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/api/v1/productos")
 public class ProductoController {
 
     @Autowired
@@ -78,6 +79,7 @@ public class ProductoController {
     // GUARDAR
 
     @PostMapping("/guardar")
+    @PreAuthorize("hasAnyRole('ADMIN','VENDEDOR')")
     public ResponseEntity<Producto> guardarProducto(@RequestBody Producto producto) {
         try {
             Producto nuevoProducto = productoService.guardarProducto(producto);
@@ -90,6 +92,7 @@ public class ProductoController {
     // ELIMINAR
 
     @DeleteMapping("/eliminar/id/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> eliminarPorId(@PathVariable Long id) {
         try {
             productoService.eliminarPorId(id);
@@ -100,6 +103,7 @@ public class ProductoController {
     }
 
     @DeleteMapping("/eliminar/codigo/{codigo}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> eliminarPorCodigo(@PathVariable String codigo) {
         try {
             productoService.eliminarPorCodigo(codigo);
@@ -112,6 +116,7 @@ public class ProductoController {
     // ACTUALIZAR TODO
 
     @PutMapping("/actualizar/codigo/{codigo}")
+    @PreAuthorize("hasAnyRole('ADMIN','VENDEDOR')")
     public ResponseEntity<Producto> actualizarProducto(@RequestBody Producto producto, @PathVariable String codigo) {
         try {
             Producto productoActualizado = productoService.actualizarProducto(producto, codigo);
