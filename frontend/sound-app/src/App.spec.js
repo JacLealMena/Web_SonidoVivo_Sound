@@ -1,6 +1,7 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import App from './components/App';
+import AdminDashboard from './components/AdminDashboard';
 import { DEFAULT_PRODUCTS, DEFAULT_USERS, formatCLP, STORAGE_KEYS } from './components/store';
 
 const testProduct = DEFAULT_PRODUCTS[0];
@@ -134,7 +135,6 @@ describe('catálogo y carrito', () => {
     expect(readStoredValue(STORAGE_KEYS.CART)[0].cantidad).toBe(1);
   });
 });
-
 describe('autenticación', () => {
   // 09. Confirma que unas credenciales inválidas no inicien sesión.
   it('rechaza credenciales incorrectas en el formulario de acceso', () => {
@@ -370,5 +370,46 @@ describe('compra y persistencia', () => {
     expect(screen.getByRole('button', { name: 'Abrir carrito, 1 productos' })).toBeTruthy();
     expect(screen.getAllByText(testProduct.nombre).length).toBe(2);
     expect(readStoredValue(STORAGE_KEYS.CART)[0].cantidad).toBe(1);
+  });
+});
+
+describe('detalle de métricas administrativas', () => {
+  it('despliega ventas y pedidos con sus importes, productos y datos de registro', () => {
+    const order = {
+      id: 123,
+      numero: 'PED-000123',
+      clienteNombre: 'Cliente de prueba',
+      fecha: '2026-11-23T12:00:00.000Z',
+      items: [{ id: 1, nombre: 'Guitarra de prueba', cantidad: 2 }],
+      total: 75000,
+      estado: 'En preparación'
+    };
+
+    render(
+      <AdminDashboard
+        products={DEFAULT_PRODUCTS}
+        users={DEFAULT_USERS}
+        orders={[order]}
+        currentUser={DEFAULT_USERS[0]}
+        onProductsChange={() => {}}
+        onUsersChange={() => {}}
+        onOrderStatus={() => {}}
+        onNavigate={() => {}}
+        onLogout={() => {}}
+      />
+    );
+
+    const salesButton = screen.getByRole('button', { name: /ventas totales/i });
+    expect(salesButton.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(salesButton);
+    expect(screen.getByRole('heading', { name: 'Detalle de ventas registradas' })).toBeTruthy();
+    expect(screen.getByText('Guitarra de prueba x 2')).toBeTruthy();
+    expect(within(screen.getByRole('region', { name: 'Detalle de ventas registradas' })).getByText(formatCLP(order.total))).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /pedidos registrados/i }));
+    expect(screen.queryByRole('heading', { name: 'Detalle de ventas registradas' })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Detalle de pedidos registrados' })).toBeTruthy();
+    expect(screen.getByText('Cliente de prueba')).toBeTruthy();
+    expect(screen.getByText('En preparación')).toBeTruthy();
   });
 });

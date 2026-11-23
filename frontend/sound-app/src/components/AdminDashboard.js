@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CATEGORIES, ROLES, confirmAction, createId, formatCLP, getSalePrice, showMessage } from './store';
+import InventoryFilters, { filterInventoryProducts } from './InventoryFilters';
 
 const ORDER_STATUSES = ['En preparación', 'Despachado', 'Entregado'];
 const USER_ROLES = [
@@ -12,9 +13,17 @@ const USER_ROLES = [
 export default function AdminDashboard({ products, users, orders, currentUser, onProductsChange, onUsersChange, onOrderStatus, onNavigate, onLogout }) {
   const [activeTab, setActiveTab] = useState('products');
   const [editingProduct, setEditingProduct] = useState(null);
+  const [expandedMetric, setExpandedMetric] = useState(null);
+  const [stockFilters, setStockFilters] = useState({ query: '', category: '', stockStatus: 'all' });
+  const filteredProducts = filterInventoryProducts(products, stockFilters);
   const totalSales = orders.reduce((total, order) => total + Number(order.total || 0), 0);
   const activeOrders = orders.filter((order) => order.estado !== 'Entregado').length;
   const criticalProducts = products.filter((product) => Number(product.stock || 0) <= Number(product.stockCritico || 0)).length;
+
+  /** Despliega el detalle de una métrica o lo cierra si ya estaba abierto. */
+  function handleMetricToggle(metric) {
+    setExpandedMetric((currentMetric) => currentMetric === metric ? null : metric);
+  }
 
   /** Selecciona la pestaña del panel que se mostrará. */
   function handleTabChange(event) {
@@ -138,9 +147,11 @@ export default function AdminDashboard({ products, users, orders, currentUser, o
 
       <div className="row g-4 mb-4">
         <MetricCard title="Total de productos" value={products.length} icon="fa-boxes-stacked" />
-        <MetricCard title="Ventas totales" value={formatCLP(totalSales)} icon="fa-dollar-sign" highlight />
-        <MetricCard title="Pedidos registrados" value={orders.length} icon="fa-receipt" />
+        <MetricCard title="Ventas totales" value={formatCLP(totalSales)} icon="fa-dollar-sign" highlight detailsId="sales-details" expanded={expandedMetric === 'sales'} onToggle={() => handleMetricToggle('sales')} />
+        <MetricCard title="Pedidos registrados" value={orders.length} icon="fa-receipt" detailsId="orders-details" expanded={expandedMetric === 'orders'} onToggle={() => handleMetricToggle('orders')} />
       </div>
+
+      {expandedMetric && <MetricDetails id={`${expandedMetric}-details`} metric={expandedMetric} orders={orders} />}
 
       <ul className="nav nav-tabs admin-tabs mb-4" role="tablist" aria-label="Secciones administrativas">
         <TabButton tab="products" activeTab={activeTab} onSelect={handleTabChange} icon="fa-boxes-stacked">Productos</TabButton>
@@ -158,15 +169,21 @@ export default function AdminDashboard({ products, users, orders, currentUser, o
             <InventoryInsight products={products} />
           </div>
           <div className="card border-0 shadow-sm rounded-4 mb-5">
-            <div className="card-body p-0"><div className="table-responsive">
+            <div className="card-body p-0">
+              <div className="p-3 pb-0">
+                <InventoryFilters filters={stockFilters} onChange={setStockFilters} />
+                <p className="small text-muted mt-2 mb-0">Mostrando {filteredProducts.length} de {products.length} productos</p>
+              </div>
+              <div className="table-responsive">
               <table className="table table-hover align-middle mb-0">
                 <thead className="table-dark"><tr><th>ID</th><th>Imagen</th><th>Nombre</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Stock crítico</th><th className="text-center">Acciones</th></tr></thead>
                 <tbody>
-                  {products.map((product) => <AdminProductRow key={product.id} product={product} onEdit={handleEditProduct} onDelete={handleDeleteProduct} onStockChange={handleStockChange} />)}
-                  {!products.length && <tr><td colSpan="8" className="text-center text-muted py-4">No hay productos registrados.</td></tr>}
+                  {filteredProducts.map((product) => <AdminProductRow key={product.id} product={product} onEdit={handleEditProduct} onDelete={handleDeleteProduct} onStockChange={handleStockChange} />)}
+                  {!filteredProducts.length && <tr><td colSpan="8" className="text-center text-muted py-4">{products.length ? 'No hay productos que coincidan con los filtros.' : 'No hay productos registrados.'}</td></tr>}
                 </tbody>
               </table>
-            </div></div>
+              </div>
+            </div>
           </div>
         </section>
       )}
@@ -187,8 +204,67 @@ export default function AdminDashboard({ products, users, orders, currentUser, o
 }
 
 /** Presenta una métrica principal del negocio con su icono. */
-function MetricCard({ title, value, icon, highlight = false }) {
-  return <div className="col-md-4"><div className="card shadow-sm border-0 rounded-4 h-100 dashboard-card"><div className="card-body"><div className="d-flex justify-content-between align-items-center mb-2"><h2 className="h6 text-muted text-uppercase mb-0">{title}</h2><span className={`badge ${highlight ? 'bg-success-subtle text-success' : 'bg-primary-subtle text-primary'}`}><i className={`fa-solid ${icon}`} /></span></div><p className={`h3 fw-bold mb-0 ${highlight ? 'text-success' : ''}`}>{value}</p></div></div></div>;
+function MetricCard({ title, value, icon, highlight = false, detailsId, expanded, onToggle }) {
+  const content = <>
+    <div className="d-flex justify-content-between align-items-center mb-2">
+      <h2 className="h6 text-muted text-uppercase mb-0">{title}</h2>
+      <span className={`badge ${highlight ? 'bg-success-subtle text-success' : 'bg-primary-subtle text-primary'}`}><i className={`fa-solid ${icon}`} /></span>
+    </div>
+    <div className="d-flex justify-content-between align-items-center">
+      <p className={`h3 fw-bold mb-0 ${highlight ? 'text-success' : ''}`}>{value}</p>
+      {onToggle && <i className={`fa-solid ${expanded ? 'fa-chevron-up' : 'fa-chevron-down'} text-muted`} aria-hidden="true" />}
+    </div>
+  </>;
+
+  return <div className="col-md-4"><div className="card shadow-sm border-0 rounded-4 h-100 dashboard-card">
+    {onToggle
+      ? <button className="card-body w-100 text-start border-0 bg-transparent" type="button" aria-expanded={expanded} aria-controls={detailsId} onClick={onToggle}>{content}</button>
+      : <div className="card-body">{content}</div>}
+  </div></div>;
+}
+
+/** Presenta las ventas o pedidos incluidos en la métrica seleccionada. */
+function MetricDetails({ id, metric, orders }) {
+  const isSales = metric === 'sales';
+  const title = isSales ? 'Detalle de ventas registradas' : 'Detalle de pedidos registrados';
+
+  return (
+    <section id={id} className="card border-0 shadow-sm rounded-4 mb-4" aria-labelledby={`${id}-title`}>
+      <div className="card-body">
+        <h2 id={`${id}-title`} className="h5 fw-bold mb-3">{title}</h2>
+        <div className="table-responsive">
+          <table className="table table-hover align-middle mb-0">
+            <thead className="table-light">
+              {isSales
+                ? <tr><th>Pedido</th><th>Fecha</th><th>Cliente</th><th>Productos vendidos</th><th className="text-end">Valor de venta</th></tr>
+                : <tr><th>Pedido</th><th>Cliente</th><th>Fecha</th><th>Productos</th><th>Estado</th><th className="text-end">Total</th></tr>}
+            </thead>
+            <tbody>
+              {orders.map((order) => (
+                <tr key={order.id}>
+                  <td className="fw-semibold">{order.numero}</td>
+                  {!isSales && <td>{order.clienteNombre}</td>}
+                  <td>{new Date(order.fecha).toLocaleDateString('es-CL')}</td>
+                  {isSales && <td>{order.clienteNombre}</td>}
+                  <td>{formatOrderItems(order)}</td>
+                  {!isSales && <td>{order.estado}</td>}
+                  <td className="text-end fw-semibold">{formatCLP(order.total)}</td>
+                </tr>
+              ))}
+              {!orders.length && <tr><td colSpan={isSales ? 5 : 6} className="text-center text-muted py-4">No hay registros para mostrar.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** Resume los artículos guardados en un pedido. */
+function formatOrderItems(order) {
+  return Array.isArray(order.items) && order.items.length
+    ? order.items.map((item) => `${item.nombre} x ${item.cantidad}`).join(', ')
+    : 'Sin productos detallados';
 }
 
 /** Selecciona una pestaña del panel de administración. */
@@ -201,18 +277,23 @@ function InsightCard({ title, value, description, icon }) {
   return <div className="col-lg-4"><div className="info-panel p-3 h-100"><div className="d-flex justify-content-between align-items-center mb-2"><span className="text-muted text-uppercase small">{title}</span><span className="badge bg-warning-subtle text-warning"><i className={`fa-solid ${icon}`} /></span></div><h2 className="h4 fw-bold mb-1">{value}</h2><small className="text-muted">{description}</small></div></div>;
 }
 
-/** Muestra las categorías con mayor stock y las alertas de inventario críticas. */
+/** Muestra el stock total por categoría y las alertas de inventario críticas. */
 function InventoryInsight({ products }) {
   const stockByCategory = Object.entries(products.reduce((totals, product) => {
     totals[product.categoria] = (totals[product.categoria] || 0) + Number(product.stock || 0);
     return totals;
-  }, {})).sort((first, second) => second[1] - first[1]).slice(0, 5);
+  }, {})).sort((first, second) => second[1] - first[1]);
+  const totalStock = stockByCategory.reduce((total, [, stock]) => total + stock, 0);
   const maximumStock = Math.max(1, ...stockByCategory.map(([, stock]) => stock));
   const criticalProducts = products.filter((product) => Number(product.stock || 0) <= Number(product.stockCritico || 0)).slice(0, 4);
 
   return (
     <>
-      <div className="col-lg-7"><div className="info-panel p-3 h-100"><h2 className="h6 fw-bold mb-3"><i className="fa-solid fa-layer-group me-2 text-primary" />Distribución de stock</h2>
+      <div className="col-lg-7"><div className="info-panel p-3 h-100">
+        <div className="d-flex justify-content-between align-items-center mb-3 gap-2">
+          <h2 className="h6 fw-bold mb-0"><i className="fa-solid fa-layer-group me-2 text-primary" />Distribución de stock</h2>
+          <span className="badge bg-primary-subtle text-primary">Total: {totalStock} und.</span>
+        </div>
         {stockByCategory.map(([category, stock]) => <StockBar key={category} category={category} stock={stock} maxStock={maximumStock} />)}
         {!stockByCategory.length && <p className="text-muted mb-0">Sin productos disponibles.</p>}
       </div></div>
@@ -468,6 +549,8 @@ function ProductEditor({ product, onSave, onClose }) {
   const [formData, setFormData] = useState({
     codigo: product.codigo || '',
     nombre: product.nombre || '',
+    marca: product.marca || '',
+    modelo: product.modelo || '',
     descripcion: product.descripcion || '',
     categoria: product.categoria || CATEGORIES[0],
     precio: product.precio ?? '',
@@ -490,30 +573,39 @@ function ProductEditor({ product, onSave, onClose }) {
       showMessage({ icon: 'error', title: 'Datos inválidos', text: 'Completa código, nombre, precio y stock con valores válidos.' });
       return;
     }
-    onSave({ ...nextProduct, codigo: formData.codigo.trim(), nombre: formData.nombre.trim(), imagen: formData.imagen.trim() || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=600&q=80' });
+    onSave({
+      ...nextProduct,
+      codigo: formData.codigo.trim(),
+      nombre: formData.nombre.trim(),
+      marca: formData.marca.trim(),
+      modelo: formData.modelo.trim(),
+      imagen: formData.imagen.trim() || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=600&q=80'
+    });
   }
 
   return <div className="modal d-block" role="dialog" aria-modal="true" aria-labelledby="productEditorTitle" tabIndex="-1" style={{ background: 'rgba(0, 0, 0, .5)' }}>
-    <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable"><div className="modal-content">
-      <div className="modal-header"><h2 className="modal-title h5" id="productEditorTitle">{product.id ? 'Editar producto' : 'Nuevo producto'}</h2><button type="button" className="btn-close" onClick={onClose} aria-label="Cerrar" /></div>
-      <form onSubmit={handleSubmit}>
+    <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+      <form className="modal-content" onSubmit={handleSubmit}>
+        <div className="modal-header"><h2 className="modal-title h5" id="productEditorTitle">{product.id ? 'Editar producto' : 'Nuevo producto'}</h2><button type="button" className="btn-close" onClick={onClose} aria-label="Cerrar" /></div>
         <div className="modal-body"><div className="row g-3">
           <EditorField name="codigo" label="Código único" value={formData.codigo} onChange={handleFieldChange} />
           <EditorField name="nombre" label="Nombre" value={formData.nombre} onChange={handleFieldChange} />
+          <EditorField name="marca" label="Marca" value={formData.marca} onChange={handleFieldChange} required={false} />
+          <EditorField name="modelo" label="Modelo" value={formData.modelo} onChange={handleFieldChange} required={false} />
           <label className="col-12">Descripción<textarea className="form-control mt-1" name="descripcion" value={formData.descripcion} onChange={handleFieldChange} rows="2" /></label>
           <label className="col-md-6">Categoría<select className="form-select mt-1" name="categoria" value={formData.categoria} onChange={handleFieldChange}>{CATEGORIES.map((category) => <option key={category}>{category}</option>)}</select></label>
           <EditorField name="precio" label="Precio (CLP)" type="number" min="0" value={formData.precio} onChange={handleFieldChange} />
           <EditorField name="stock" label="Stock" type="number" min="0" value={formData.stock} onChange={handleFieldChange} />
-          <EditorField name="stockCritico" label="Stock crítico" type="number" min="0" value={formData.stockCritico} onChange={handleFieldChange} />
-          <EditorField name="imagen" label="URL de imagen" type="url" value={formData.imagen} onChange={handleFieldChange} />
+          <EditorField name="stockCritico" label="Stock crítico" type="number" min="0" value={formData.stockCritico} onChange={handleFieldChange} required={false} />
+          <EditorField name="imagen" label="URL de imagen" type="url" value={formData.imagen} onChange={handleFieldChange} required={false} />
         </div></div>
         <div className="modal-footer"><button type="button" className="btn btn-outline-secondary" onClick={onClose}>Cancelar</button><button type="submit" className="btn btn-success">Guardar</button></div>
       </form>
-    </div></div>
+    </div>
   </div>;
 }
 
 /** Renderiza un campo reutilizable del formulario de producto. */
-function EditorField({ name, label, type = 'text', min, value, onChange }) {
-  return <label className="col-md-6">{label}<input className="form-control mt-1" name={name} type={type} min={min} value={value} onChange={onChange} required={name !== 'stockCritico' && name !== 'imagen'} /></label>;
+function EditorField({ name, label, type = 'text', min, value, onChange, required = true }) {
+  return <label className="col-md-6">{label}<input className="form-control mt-1" name={name} type={type} min={min} value={value} onChange={onChange} required={required} /></label>;
 }

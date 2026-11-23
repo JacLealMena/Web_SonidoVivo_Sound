@@ -43,7 +43,10 @@ export const ProductService = {
 
   // GUARDAR
   createProduct: async (product) => {
-    const response = await axios.post(`${API_URL}/guardar`, product, { headers: authorizedHeaders() });
+    const productPayload = { ...product };
+    // The database generates this ID; the client value is only temporary.
+    delete productPayload.id;
+    const response = await axios.post(`${API_URL}/guardar`, productPayload, { headers: authorizedHeaders() });
     return response.data;
   },
 
